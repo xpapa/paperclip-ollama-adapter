@@ -171,20 +171,39 @@ export function buildToolEnv(ctx) {
 /**
  * Resolves the Paperclip API base URL exposed to run_command as
  * PAPERCLIP_API_URL. The wake prompt appends "/api/...", so this returns the
- * origin WITHOUT a trailing "/api" or slash. Priority: adapter config override,
- * then process env, then the loopback default the server binds to.
+ * origin WITHOUT a trailing "/api" or slash.
+ *
+ * run_command runs on the same host as the server, which binds loopback, so we
+ * use the server's actual listen host/port. We deliberately avoid
+ * process.env.PAPERCLIP_API_URL: the server sets that to the public/preferred
+ * URL (e.g. an nginx hostname on a different port) which is NOT reachable for
+ * co-located local tool execution. Priority: explicit adapter override,
+ * server listen host+port, runtime (loopback) URL, loopback default.
  */
 function resolveApiBaseUrl(ctx) {
     const config = (ctx.config ?? {});
-    const raw = (typeof config.paperclipApiUrl === "string" && config.paperclipApiUrl.trim() !== ""
+    const normalize = (value) => value.trim().replace(/\/+$/, "").replace(/\/api$/, "").replace(/\/+$/, "");
+    const readEnv = (key) => {
+        const value = process.env[key];
+        return typeof value === "string" && value.trim() !== "" ? value.trim() : undefined;
+    };
+    const override = typeof config.paperclipApiUrl === "string" && config.paperclipApiUrl.trim() !== ""
         ? config.paperclipApiUrl
-        : undefined)
-        ?? (typeof process.env.PAPERCLIP_API_URL === "string" && process.env.PAPERCLIP_API_URL.trim() !== ""
-            ? process.env.PAPERCLIP_API_URL
-            : undefined)
-        ?? "http://127.0.0.1:3101";
-    // Defensive: strip a trailing /api (prompt appends it) and trailing slashes.
-    return raw.trim().replace(/\/+$/, "").replace(/\/api$/, "").replace(/\/+$/, "");
+        : undefined;
+    if (override) {
+        return normalize(override);
+    }
+    const listenPort = readEnv("PAPERCLIP_LISTEN_PORT");
+    if (listenPort) {
+        const rawHost = readEnv("PAPERCLIP_LISTEN_HOST");
+        const host = !rawHost || rawHost === "0.0.0.0" || rawHost === "::" ? "127.0.0.1" : rawHost;
+        return `http://${host}:${listenPort}`;
+    }
+    const runtimeUrl = readEnv("PAPERCLIP_RUNTIME_API_URL");
+    if (runtimeUrl) {
+        return normalize(runtimeUrl);
+    }
+    return "http://127.0.0.1:3101";
 }
 function readTaskId(ctx) {
     const contextTaskId = readContextString(ctx.context, "taskId");

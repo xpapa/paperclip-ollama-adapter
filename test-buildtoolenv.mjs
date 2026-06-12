@@ -12,10 +12,17 @@ const ctx = {
   authToken: "jwt-token-value",
 };
 
+// Simulate the server runtime env: PAPERCLIP_API_URL points at the public
+// (unreachable-for-local) host, while the loopback listen host/port is the
+// address run_command must actually use.
+process.env.PAPERCLIP_API_URL = "http://172.16.250.1:3101"; // public, wrong for local
+process.env.PAPERCLIP_LISTEN_HOST = "127.0.0.1";
+process.env.PAPERCLIP_LISTEN_PORT = "3101";
+
 const env = buildToolEnv(ctx);
 const checks = [
   ["PAPERCLIP_API_KEY", "jwt-token-value"],
-  ["PAPERCLIP_API_URL", undefined], // any non-empty value is fine
+  ["PAPERCLIP_API_URL", "http://127.0.0.1:3101"], // loopback, NOT the public host
   ["PAPERCLIP_RUN_ID", "run-123"],
   ["PAPERCLIP_AGENT_ID", "agent-abc"],
 ];
