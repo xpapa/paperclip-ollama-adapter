@@ -1,0 +1,9 @@
+export const ADAPTER_TYPE = "ollama_local";
+export const DEFAULT_BASE_URL = "http://127.0.0.1:11434";
+export const DEFAULT_TIMEOUT_SEC = 120;
+export const DEFAULT_OLLAMA_TIMEOUT_SEC = 60;
+export const DEFAULT_COMMAND_TIMEOUT_SEC = 120;
+export const DEFAULT_MAX_TOOL_CALLS = 8;
+export const OLLAMA_THINK_LEVELS = ["low", "medium", "high"];
+export const OLLAMA_SKILL_SELECTION_MODES = ["deterministic", "llm"];
+//# sourceMappingURL=types.js.map

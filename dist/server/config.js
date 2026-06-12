@@ -1,0 +1,175 @@
+import { DEFAULT_COMMAND_TIMEOUT_SEC, DEFAULT_MAX_TOOL_CALLS, DEFAULT_OLLAMA_TIMEOUT_SEC, DEFAULT_TIMEOUT_SEC, OLLAMA_SKILL_SELECTION_MODES, OLLAMA_THINK_LEVELS } from "../types.js";
+import { readDefaultBaseUrl } from "../base-url.js";
+/**
+ * Normalizes Paperclip configuration into the adapter's runtime shape.
+ *
+ * Paperclip can provide values either as top-level built-ins (`model`,
+ * `timeoutSec`, `thinkingEffort`) or under `adapterSchemaValues` for custom UI
+ * fields. This parser intentionally accepts both locations so the adapter stays
+ * compatible across Paperclip UI/runtime versions.
+ */
+export function parseConfig(raw) {
+    const errors = [];
+    const schemaValues = readRecord(raw.adapterSchemaValues);
+    const model = readString(readConfigValue(raw, schemaValues, "model"))?.trim();
+    const baseUrl = readString(readConfigValue(raw, schemaValues, "baseUrl"))?.trim() || readDefaultBaseUrl();
+    const timeoutSec = readNumber(readConfigValue(raw, schemaValues, "timeoutSec"), DEFAULT_TIMEOUT_SEC);
+    const ollamaTimeoutSec = readNumber(readConfigValue(raw, schemaValues, "ollamaTimeoutSec"), DEFAULT_OLLAMA_TIMEOUT_SEC);
+    const logging = readBoolean(readConfigValue(raw, schemaValues, "logging"));
+    const streaming = readBoolean(readConfigValue(raw, schemaValues, "streaming")) ?? true;
+    const enableCommandExecution = readBoolean(readConfigValue(raw, schemaValues, "enableCommandExecution")) ?? false;
+    const commandCwd = readString(readConfigValue(raw, schemaValues, "commandCwd"))
+        ?? readString(readConfigValue(raw, schemaValues, "cwd"));
+    const commandTimeoutSec = readNumber(readConfigValue(raw, schemaValues, "commandTimeoutSec"), DEFAULT_COMMAND_TIMEOUT_SEC);
+    const maxToolCalls = readNumber(readConfigValue(raw, schemaValues, "maxToolCalls"), DEFAULT_MAX_TOOL_CALLS);
+    const thinkValue = readConfigValue(raw, schemaValues, "think")
+        ?? readConfigValue(raw, schemaValues, "thinkingEffort");
+    const think = parseThink(thinkValue);
+    const instructions = readString(readConfigValue(raw, schemaValues, "instructions"));
+    const promptTemplate = readString(readConfigValue(raw, schemaValues, "promptTemplate"));
+    const skillSelectionModeValue = readConfigValue(raw, schemaValues, "skillSelectionMode");
+    const skillSelectionMode = parseSkillSelectionMode(skillSelectionModeValue);
+    if (!model) {
+        errors.push("Missing required field: model");
+    }
+    if (!isValidHttpUrl(baseUrl)) {
+        errors.push("baseUrl must be a valid HTTP or HTTPS URL");
+    }
+    if (!Number.isFinite(timeoutSec) || timeoutSec <= 0) {
+        errors.push("timeoutSec must be greater than 0");
+    }
+    if (!Number.isFinite(ollamaTimeoutSec) || ollamaTimeoutSec <= 0) {
+        errors.push("ollamaTimeoutSec must be greater than 0");
+    }
+    if (!Number.isFinite(commandTimeoutSec) || commandTimeoutSec <= 0) {
+        errors.push("commandTimeoutSec must be greater than 0");
+    }
+    if (!Number.isInteger(maxToolCalls) || maxToolCalls <= 0) {
+        errors.push("maxToolCalls must be a positive integer");
+    }
+    if (enableCommandExecution && commandCwd !== undefined && commandCwd.trim() === "") {
+        errors.push("commandCwd cannot be empty when command execution is enabled");
+    }
+    if (thinkValue !== undefined && think === undefined) {
+        errors.push('think must be true, false, "low", "medium", "high", or omitted');
+    }
+    if (skillSelectionModeValue !== undefined && skillSelectionMode === undefined) {
+        errors.push('skillSelectionMode must be "deterministic", "llm", or omitted');
+    }
+    if (errors.length > 0 || !model) {
+        return { config: null, errors };
+    }
+    return {
+        config: {
+            model,
+            baseUrl: stripTrailingSlash(baseUrl),
+            timeoutSec,
+            ollamaTimeoutSec,
+            streaming,
+            enableCommandExecution,
+            commandTimeoutSec,
+            maxToolCalls,
+            skillSelectionMode: skillSelectionMode ?? "deterministic",
+            ...(commandCwd ? { commandCwd } : {}),
+            ...(logging !== undefined ? { logging } : {}),
+            ...(think !== undefined ? { think } : {}),
+            ...(instructions ? { instructions } : {}),
+            ...(promptTemplate ? { promptTemplate } : {})
+        },
+        errors
+    };
+}
+/** Reads a config key from built-in values first, then custom schema values. */
+function readConfigValue(raw, schemaValues, key) {
+    return raw[key] ?? schemaValues[key];
+}
+function readRecord(value) {
+    return typeof value === "object" && value !== null
+        ? value
+        : {};
+}
+function readString(value) {
+    return typeof value === "string" ? value : undefined;
+}
+function readNumber(value, fallback) {
+    if (typeof value === "number") {
+        return value;
+    }
+    if (typeof value === "string" && value.trim() !== "") {
+        return Number(value);
+    }
+    return fallback;
+}
+function readBoolean(value) {
+    if (value === undefined) {
+        return undefined;
+    }
+    if (typeof value === "boolean") {
+        return value;
+    }
+    if (typeof value !== "string") {
+        return undefined;
+    }
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true") {
+        return true;
+    }
+    if (normalized === "false") {
+        return false;
+    }
+    return undefined;
+}
+function parseThink(value) {
+    if (value === undefined) {
+        return undefined;
+    }
+    if (typeof value === "boolean") {
+        return value;
+    }
+    if (typeof value !== "string") {
+        return undefined;
+    }
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true") {
+        return true;
+    }
+    if (normalized === "false") {
+        return false;
+    }
+    if (isThinkLevel(normalized)) {
+        return normalized;
+    }
+    return undefined;
+}
+function parseSkillSelectionMode(value) {
+    if (value === undefined) {
+        return undefined;
+    }
+    if (typeof value !== "string") {
+        return undefined;
+    }
+    const normalized = value.trim().toLowerCase();
+    if (isSkillSelectionMode(normalized)) {
+        return normalized;
+    }
+    return undefined;
+}
+function isSkillSelectionMode(value) {
+    return OLLAMA_SKILL_SELECTION_MODES.includes(value);
+}
+function isThinkLevel(value) {
+    return OLLAMA_THINK_LEVELS.includes(value);
+}
+function isValidHttpUrl(value) {
+    try {
+        const url = new URL(value);
+        return url.protocol === "http:" || url.protocol === "https:";
+    }
+    catch {
+        return false;
+    }
+}
+function stripTrailingSlash(value) {
+    return value.replace(/\/+$/, "");
+}
+//# sourceMappingURL=config.js.map

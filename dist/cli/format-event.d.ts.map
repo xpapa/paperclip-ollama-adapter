@@ -1,0 +1,1 @@
+{"version":3,"file":"format-event.d.ts","sourceRoot":"","sources":["../../src/cli/format-event.ts"],"names":[],"mappings":"AAAA,MAAM,WAAW,eAAe;IAC9B,MAAM,CAAC,EAAE,QAAQ,GAAG,QAAQ,CAAC;IAC7B,OAAO,CAAC,EAAE,MAAM,CAAC;IACjB,KAAK,CAAC,EAAE,MAAM,CAAC;IACf,CAAC,GAAG,EAAE,MAAM,GAAG,OAAO,CAAC;CACxB;AAED,wBAAgB,cAAc,CAAC,KAAK,EAAE,eAAe,GAAG,MAAM,CAI7D"}

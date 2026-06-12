@@ -1,0 +1,43 @@
+export const agentConfigurationDoc = `# Local Ollama configuration
+
+Adapter type: \`ollama_local\`
+
+Model dropdown:
+- The dropdown is populated by the adapter's \`listModels()\` hook.
+- \`Test environment\` queries \`GET /api/tags\` with the configured \`baseUrl\` and stores the latest successful result in process memory.
+- \`listModels()\` returns that cached result first. Without a cache, it queries \`GET /api/tags\` using \`OLLAMA_BASE_URL\` when set, otherwise \`http://127.0.0.1:11434\`.
+- If live discovery fails, the adapter returns a fallback list so the UI can still render.
+- Paperclip's current \`listModels()\` hook does not pass the per-agent \`baseUrl\` config value, so the cache is process-local and last-writer-wins.
+
+Core fields:
+- \`model\` (string, required): Ollama model name, for example \`llama3.2\` or \`qwen2.5-coder\`.
+- \`baseUrl\` (string, optional): Ollama server root. Defaults to \`OLLAMA_BASE_URL\` when set, otherwise \`http://127.0.0.1:11434\`.
+- \`timeoutSec\` (number, optional): Paperclip's built-in run timeout control. Defaults to \`120\`.
+- \`ollamaTimeoutSec\` (number, optional): HTTP timeout for each Ollama \`/api/chat\` call, including skill classification and generation. Defaults to \`60\`; increase this for long non-streaming generations.
+- \`logging\` (boolean, optional): Enables detailed Paperclip logs for prompt rendering, Ollama chat request bodies, raw Ollama replies, parsed results, and failures. Defaults to \`false\`.
+- \`streaming\` (boolean, optional): Requests streamed Ollama responses, forwards content chunks to run logs, and aggregates chunks locally. Defaults to \`true\`.
+- \`think\` (false | "low" | "medium" | "high", optional): Adapter-specific thinking control. Use \`false\` to disable thinking. When set, this overrides Paperclip's built-in \`thinkingEffort\` value.
+- \`enableCommandExecution\` (boolean, optional): Enables trusted local \`run_command\` tool calls from Ollama. Defaults to \`false\`.
+- \`commandCwd\` (string, optional): Absolute working directory for model-requested commands. Defaults to \`context.paperclipWorkspace.cwd\` from the Paperclip project workspace when available, otherwise the adapter process directory.
+- \`commandTimeoutSec\` (number, optional): Maximum seconds each model-requested command may run. Defaults to \`120\`.
+- \`maxToolCalls\` (number, optional): Maximum number of command tool calls in one run. Defaults to \`8\`.
+- \`thinkingEffort\` (true | false | "low" | "medium" | "high", optional): Fallback for Paperclip's built-in Thinking Effort field. The adapter's own \`think\` field is preferred because it exposes an explicit Off option in the UI.
+- \`skillSelectionMode\` ("deterministic" | "llm", optional): Controls how Paperclip-managed skills are expanded into full prompt instructions. Defaults to \`deterministic\`.
+- \`instructions\` (string, optional): System instructions for the agent.
+- \`promptTemplate\` (string, optional): Prompt template for Paperclip wake context.
+
+Skills:
+- The adapter implements Paperclip-managed \`listSkills\` and \`syncSkills\` hooks.
+- With \`skillSelectionMode=deterministic\`, required skills are expanded using local name/description matching.
+- With \`skillSelectionMode=llm\`, the adapter asks the configured Ollama model to classify the wake context against selected skill names and descriptions before the main request; if classification fails, it falls back to deterministic matching.
+- Explicitly selected skills are always injected in full.
+- Ollama has no native skill directory, so the adapter uses ephemeral prompt injection and does not write skills into the project workspace.
+
+Command execution requires a model that returns native Ollama \`message.tool_calls\` from \`/api/chat\`. Text-only tool-call imitations such as XML-style \`<function_calls>\` blocks are treated as normal assistant text and will not run commands.
+
+Major TODOs before production use:
+- Decide what session state should be persisted across heartbeats.
+- Add Paperclip API fetches for thin context runs.
+- Add richer structured CLI event formatting.
+`;
+//# sourceMappingURL=configuration-doc.js.map
