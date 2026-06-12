@@ -24,6 +24,7 @@ Core fields:
 - \`thinkingEffort\` (true | false | "low" | "medium" | "high", optional): Fallback for Paperclip's built-in Thinking Effort field. The adapter's own \`think\` field is preferred because it exposes an explicit Off option in the UI.
 - \`skillSelectionMode\` ("deterministic" | "llm", optional): Controls how Paperclip-managed skills are expanded into full prompt instructions. Defaults to \`deterministic\`.
 - \`instructions\` (string, optional): System instructions for the agent.
+- \`instructionsFilePath\` (string, optional): Path to a Paperclip-managed instructions file (e.g. the managed AGENTS.md bundle). Its content is prepended to \`instructions\` and sent as the system message.
 - \`promptTemplate\` (string, optional): Prompt template for Paperclip wake context.
 
 Skills:

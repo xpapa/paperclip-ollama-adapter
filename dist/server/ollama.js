@@ -94,6 +94,14 @@ export async function invokeOllama(request) {
             const assistantMessage = readAssistantMessage(record);
             const toolCalls = assistantMessage.tool_calls ?? [];
             if (toolCalls.length === 0) {
+                // Diagnose silently-failing models: text-based tool-call markup
+                // without native tool_calls means the model never received (or
+                // ignored) the tools parameter — surface it instead of ending
+                // the run as a plain "plan-only" response.
+                const finalContent = readString(readRecord(assistantMessage).content) ?? "";
+                if (/<tool_call>|<invoke name=/.test(finalContent)) {
+                    await logOllama(request, "stderr", "Model emitted text-based tool-call markup but no native tool_calls — check enableCommandExecution and model tool support", { turn });
+                }
                 const generationStats = finalizeGeneration(generation);
                 const result = buildSuccessResult(request, session, payload, chatUrl, {
                     usage,
@@ -365,7 +373,19 @@ function mergeOllamaStreamChunks(chunks) {
         const message = readRecord(record.message);
         content += readString(message.content) ?? "";
         if (Array.isArray(message.tool_calls)) {
-            toolCalls = message.tool_calls;
+            // Accumulate across chunks instead of overwriting — streamed
+            // tool calls may arrive spread over multiple chunks. Dedupe by
+            // identity so repeated cumulative arrays don't double-execute.
+            const merged = [...(toolCalls ?? []), ...message.tool_calls];
+            const seen = new Set();
+            toolCalls = merged.filter((call) => {
+                const key = JSON.stringify(call);
+                if (seen.has(key)) {
+                    return false;
+                }
+                seen.add(key);
+                return true;
+            });
         }
     }
     return {

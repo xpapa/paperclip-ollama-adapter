@@ -27,6 +27,10 @@ export const ollamaAdapter = {
     syncSkills: syncOllamaSkills,
     sessionCodec,
     supportsLocalAgentJwt: true,
+    // The fork consumes the Paperclip-managed instructions bundle via
+    // config.instructionsFilePath (see dist/server/execute.js).
+    supportsInstructionsBundle: true,
+    instructionsPathKey: "instructionsFilePath",
     models: fallbackModels,
     async listModels() {
         const cached = getCachedModels();

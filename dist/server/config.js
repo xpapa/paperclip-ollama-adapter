@@ -26,6 +26,7 @@ export function parseConfig(raw) {
         ?? readConfigValue(raw, schemaValues, "thinkingEffort");
     const think = parseThink(thinkValue);
     const instructions = readString(readConfigValue(raw, schemaValues, "instructions"));
+    const instructionsFilePath = readString(readConfigValue(raw, schemaValues, "instructionsFilePath"))?.trim();
     const promptTemplate = readString(readConfigValue(raw, schemaValues, "promptTemplate"));
     const skillSelectionModeValue = readConfigValue(raw, schemaValues, "skillSelectionMode");
     const skillSelectionMode = parseSkillSelectionMode(skillSelectionModeValue);
@@ -74,6 +75,7 @@ export function parseConfig(raw) {
             ...(logging !== undefined ? { logging } : {}),
             ...(think !== undefined ? { think } : {}),
             ...(instructions ? { instructions } : {}),
+            ...(instructionsFilePath ? { instructionsFilePath } : {}),
             ...(promptTemplate ? { promptTemplate } : {})
         },
         errors

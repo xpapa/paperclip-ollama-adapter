@@ -1,3 +1,4 @@
+import { promises as fs } from "node:fs";
 import { ADAPTER_TYPE } from "../types.js";
 import { parseConfig } from "./config.js";
 import { invokeOllama } from "./ollama.js";
@@ -62,6 +63,24 @@ export async function execute(ctx) {
         })),
         prompt
     });
+    // Prepend the Paperclip-managed instructions bundle (AGENTS.md) to the
+    // system instructions. Builtin adapters consume config.instructionsFilePath
+    // the same way; an explicit `instructions` string is appended after it.
+    let effectiveInstructions = config.instructions;
+    if (config.instructionsFilePath) {
+        try {
+            const fileInstructions = (await fs.readFile(config.instructionsFilePath, "utf8")).trim();
+            if (fileInstructions) {
+                effectiveInstructions = [fileInstructions, config.instructions]
+                    .filter(Boolean)
+                    .join("\n\n");
+                await ctx.onLog("stdout", `[${ADAPTER_TYPE}] Injected role instructions (${fileInstructions.length} chars from ${config.instructionsFilePath})\n`);
+            }
+        }
+        catch {
+            // Non-fatal — the run proceeds without the bundle
+        }
+    }
     const result = await invokeOllama({
         baseUrl: config.baseUrl,
         model: config.model,
@@ -80,7 +99,7 @@ export async function execute(ctx) {
             maxToolCalls: config.maxToolCalls
         },
         ...(config.logging !== undefined ? { logging: config.logging } : {}),
-        ...(config.instructions ? { instructions: config.instructions } : {}),
+        ...(effectiveInstructions ? { instructions: effectiveInstructions } : {}),
         ...(config.think !== undefined ? { think: config.think } : {})
     });
     if (!result.success) {
