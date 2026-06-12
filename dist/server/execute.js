@@ -146,6 +146,13 @@ export function resolveCommandCwd(ctx, configuredCommandCwd) {
 }
 export function buildToolEnv(ctx) {
     return Object.fromEntries([
+        // The adapter declares supportsLocalAgentJwt, so the server mints a
+        // short-lived JWT and passes it as ctx.authToken. Expose it (plus the
+        // API base URL) to run_command so the model can authenticate Paperclip
+        // API writes instead of minting its own token. The wake prompt expects
+        // PAPERCLIP_API_URL as the base WITHOUT the /api suffix.
+        ["PAPERCLIP_API_KEY", typeof ctx.authToken === "string" ? ctx.authToken : undefined],
+        ["PAPERCLIP_API_URL", resolveApiBaseUrl(ctx)],
         ["PAPERCLIP_COMPANY_ID", ctx.agent.companyId],
         ["PAPERCLIP_AGENT_ID", ctx.agent.id],
         ["PAPERCLIP_RUN_ID", ctx.runId],
@@ -160,6 +167,24 @@ export function buildToolEnv(ctx) {
     ].filter((entry) => {
         return typeof entry[1] === "string" && entry[1].trim() !== "";
     }));
+}
+/**
+ * Resolves the Paperclip API base URL exposed to run_command as
+ * PAPERCLIP_API_URL. The wake prompt appends "/api/...", so this returns the
+ * origin WITHOUT a trailing "/api" or slash. Priority: adapter config override,
+ * then process env, then the loopback default the server binds to.
+ */
+function resolveApiBaseUrl(ctx) {
+    const config = (ctx.config ?? {});
+    const raw = (typeof config.paperclipApiUrl === "string" && config.paperclipApiUrl.trim() !== ""
+        ? config.paperclipApiUrl
+        : undefined)
+        ?? (typeof process.env.PAPERCLIP_API_URL === "string" && process.env.PAPERCLIP_API_URL.trim() !== ""
+            ? process.env.PAPERCLIP_API_URL
+            : undefined)
+        ?? "http://127.0.0.1:3101";
+    // Defensive: strip a trailing /api (prompt appends it) and trailing slashes.
+    return raw.trim().replace(/\/+$/, "").replace(/\/api$/, "").replace(/\/+$/, "");
 }
 function readTaskId(ctx) {
     const contextTaskId = readContextString(ctx.context, "taskId");
